@@ -3,8 +3,9 @@
 #include <assert.h>
 #include <mpi.h>
 
-#define RATIO 2 
+#define RATIO 16
 #define DATASIZE 1024*1024*20
+#define LOC ((rank/RATIO)*DATASIZE)
 
 int main(int argc, char** argv)
 {
@@ -24,7 +25,11 @@ int main(int argc, char** argv)
 	assert(size%RATIO==0);
 	data = (char*) malloc(sizeof(char)*DATASIZE);
 	rdata = (char*) malloc(sizeof(char)*DATASIZE);
-	arc4random_buf(data, DATASIZE);
+	for(i=0;i<DATASIZE;i++)
+		*(data+i) = 0xFF;
+	*(data+DATASIZE-2) = 0xBE;
+	*(data+DATASIZE-1) = 0xEF;
+//	arc4random_buf(data, DATASIZE);
 	MPI_Comm_split(MPI_COMM_WORLD, rank%RATIO, rank, &local_comm);
 	asprintf(&file_name, "data-%d.dat", rank%RATIO);
 	MPI_File_open(local_comm, file_name, 
@@ -33,9 +38,9 @@ int main(int argc, char** argv)
 	//MPI_File_write_at(file_handle, DATASIZE*rank, 
 	//		 data, DATASIZE, MPI_CHAR, &status);
 
-	MPI_File_write_at_all_begin(file_handle, DATASIZE*rank,
-		       	data, DATASIZE, MPI_CHAR);
-	MPI_File_write_at_all_end(file_handle, data, NULL);
+	MPI_File_write_at_all_begin(file_handle, LOC,
+		       	data, DATASIZE, MPI_BYTE);
+	MPI_File_write_at_all_end(file_handle, data, &status);
 
 	MPI_File_close(&file_handle);
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -43,9 +48,9 @@ int main(int argc, char** argv)
 	MPI_File_open(local_comm, file_name, MPI_MODE_RDONLY, MPI_INFO_NULL,
 			&file_handle);
 	printf("INFO: File Opened\n");
-	MPI_File_read_at_all_begin(file_handle, DATASIZE*rank, rdata, DATASIZE, MPI_CHAR);
+	MPI_File_read_at_all_begin(file_handle, LOC , rdata, DATASIZE, MPI_BYTE);
 	printf("INFO: Read Begin\n");
-	MPI_File_read_at_all_end(file_handle, rdata, NULL);
+	MPI_File_read_at_all_end(file_handle, rdata, &status);
 	printf("INFO: Read End\n");
 	MPI_File_close(&file_handle);
 	for(i=0;i<DATASIZE;i++)
