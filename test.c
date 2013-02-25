@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <mpi.h>
 
-#define RATIO 16
+#define RATIO 4
 #define DATASIZE 1024*1024*20
 #define LOC ((rank/RATIO)*DATASIZE)
 
@@ -23,6 +23,7 @@ int main(int argc, char** argv)
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	assert(size%RATIO==0);
+	if(rank == 0) printf("Starting\n");
 	data = (char*) malloc(sizeof(char)*DATASIZE);
 	rdata = (char*) malloc(sizeof(char)*DATASIZE);
 	for(i=0;i<DATASIZE;i++)
@@ -31,18 +32,21 @@ int main(int argc, char** argv)
 	*(data+DATASIZE-1) = 0xEF;
 //	arc4random_buf(data, DATASIZE);
 	MPI_Comm_split(MPI_COMM_WORLD, rank%RATIO, rank, &local_comm);
+	if(rank == 0) printf("Setup Communicator\n");
 	asprintf(&file_name, "data-%d.dat", rank%RATIO);
 	MPI_File_open(local_comm, file_name, 
 			MPI_MODE_WRONLY|MPI_MODE_CREATE, MPI_INFO_NULL,
 			&file_handle);
+	if(rank == 0) printf("Opened File\n");
 	//MPI_File_write_at(file_handle, DATASIZE*rank, 
 	//		 data, DATASIZE, MPI_CHAR, &status);
 
 	MPI_File_write_at_all_begin(file_handle, LOC,
 		       	data, DATASIZE, MPI_BYTE);
 	MPI_File_write_at_all_end(file_handle, data, &status);
-
+	if(rank == 0) printf("Rank0 done writing data\n");
 	MPI_File_close(&file_handle);
+	if(rank == 0) printf("about to read back data\n");
 	MPI_Barrier(MPI_COMM_WORLD);
 	printf("INFO: Starting to Read back Files\n");
 	MPI_File_open(local_comm, file_name, MPI_MODE_RDONLY, MPI_INFO_NULL,
